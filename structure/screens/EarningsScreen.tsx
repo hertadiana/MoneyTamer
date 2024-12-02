@@ -1,11 +1,15 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useState } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { Button } from "react-native-paper";
 import { Earning } from "../components/Earning"; // Adjust path as needed
 import { EarningsData } from "../data/EarningsData"; // Adjust path as needed
+import { RootStackParamList } from "../data/types"; // Import the route types
+
+type NavigationProps = StackNavigationProp<RootStackParamList, "Earnings">;
 
 const STORAGE_KEY = "earnings";
 
@@ -19,7 +23,8 @@ const EarningsScreen = () => {
     mentions: "",
   });
 
-  // Load earnings from storage or use initial hardcoded data
+  const navigation = useNavigation<NavigationProps>();
+
   const loadEarnings = async () => {
     try {
       const storedEarnings = await AsyncStorage.getItem(STORAGE_KEY);
@@ -33,7 +38,6 @@ const EarningsScreen = () => {
     }
   };
 
-  // Save earnings to storage
   const saveEarnings = async (updatedEarnings: Earning[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedEarnings));
@@ -42,7 +46,6 @@ const EarningsScreen = () => {
     }
   };
 
-  // Reload earnings whenever the screen is focused
   useFocusEffect(
     React.useCallback(() => {
       loadEarnings();
@@ -65,6 +68,14 @@ const EarningsScreen = () => {
     saveEarnings(newEarnings);
   };
 
+  const updateEarning = (updatedEarning: Earning) => {
+    const updatedEarnings = earnings.map((item) =>
+      item.id === updatedEarning.id ? updatedEarning : item
+    );
+    setEarnings(updatedEarnings);
+    saveEarnings(updatedEarnings);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Earnings</Text>
@@ -84,7 +95,7 @@ const EarningsScreen = () => {
       />
       <TextInput
         style={styles.input}
-        placeholder="Date (e.g., 2024-01-01)"
+        placeholder="Date"
         value={earning.date}
         onChangeText={(text) => setEarning({ ...earning, date: text })}
       />
@@ -105,9 +116,27 @@ const EarningsScreen = () => {
             <Text>
               {item.type} - ${item.sum} - {item.date} - {item.mentions}
             </Text>
-            <Button mode="text" onPress={() => deleteEarning(index)}>
-              Delete
-            </Button>
+            <View style={styles.actions}>
+              <Button
+                mode="text"
+                onPress={() => deleteEarning(index)}
+                style={styles.actionButton}
+              >
+                Delete
+              </Button>
+              <Button
+                mode="text"
+                onPress={() =>
+                  navigation.navigate("EditEarning", {
+                    earning: item,
+                    updateEarning: updateEarning,
+                  })
+                }
+                style={styles.actionButton}
+              >
+                Edit
+              </Button>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -144,6 +173,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 4,
+  },
+  actions: {
+    flexDirection: "row",
+  },
+  actionButton: {
+    marginLeft: 8,
   },
 });
 
