@@ -7,16 +7,33 @@ interface HomeScreenProps{
 }
 
 const HomeScreen = (props: HomeScreenProps) => {
-    const navigateToEarnings = () => props.navigation.navigate('Earnings');
+    const navigateToEarnings = () => props.navigation.navigate("Earnings");
+    const navigateToActualAmount = () => props.navigation.navigate("ActualAmount");
+    const navigateToBudget = () => props.navigation.navigate("Budget");
+    const navigateToMonthlyChecks = () => props.navigation.navigate("MonthlyChecks");
+    const navigateToRegretted = () => props.navigation.navigate("Regretted");
 
   
     return (
       <SafeAreaView >
-        <Button mode="contained" onPress={navigateToEarnings}>
+        <Button onPress={navigateToEarnings}>
           Go to Earnings
         </Button>
+        <Button onPress={navigateToActualAmount}>
+          Go to Actual Amount
+        </Button>
+        <Button onPress={navigateToBudget}>
+          Go to Budget
+        </Button>
+        <Button onPress={navigateToMonthlyChecks}>
+          Go to Monthly Checks
+        </Button>
+        <Button onPress={navigateToRegretted}>
+          Go to Regretted
+        </Button>
       </SafeAreaView>
+      
     );
   };
 
-export default HomeScreen;
+export default HomeScreen

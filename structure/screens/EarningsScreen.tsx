@@ -13,4 +13,4 @@ const EarningsScreen = () => {
     );
 }
 
-export default EarningsScreen;
+export default EarningsScreen
