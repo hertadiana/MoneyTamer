@@ -1,35 +1,41 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { Button } from "react-native-paper";
-import { ActualAmount } from "../components/ActualAmount";
-import { ActualAmountData } from "../data/ActualAmount";
-const STORAGE_KEY = "actualAmounts";
+import { ActualAmount } from "../../components/ActualAmount";
+import { ActualAmountData } from "../../data/ActualAmount";
+import { RootStackParamList } from "../../data/types";
 
-const ActualAmountScreen = () => {
+type NavigationProps = StackNavigationProp<RootStackParamList, "ActualAmount">;
+
+const STORAGE_KEY = "actualAmount";
+
+const EditActualAmountScreen = () => {
   const [actualAmounts, setActualAmounts] = useState<ActualAmount[]>([]);
   const [actualAmount, setActualAmount] = useState<ActualAmount>({
     id: "",
     type: "",
     sum: 0,
+   
   });
+
+  const navigation = useNavigation<NavigationProps>();
 
   const loadActualAmounts = async () => {
     try {
       const storedData = await AsyncStorage.getItem(STORAGE_KEY);
       if (storedData) {
-        const parsedData = JSON.parse(storedData) as ActualAmount[]; 
-        setActualAmounts(parsedData);
+        setActualAmounts(JSON.parse(storedData));
       } else {
-        setActualAmounts(ActualAmountData); 
+        setActualAmounts(ActualAmountData);
       }
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("Failed to load data", error);
     }
   };
-  
 
   const saveActualAmounts = async (data: ActualAmount[]) => {
     try {
@@ -39,11 +45,9 @@ const ActualAmountScreen = () => {
     }
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadActualAmounts();
-    }, [])
-  );
+  React.useEffect(() => {
+    loadActualAmounts();
+  }, []);
 
   const addActualAmount = () => {
     if (actualAmount.type.trim() !== "" && actualAmount.sum > 0) {
@@ -58,29 +62,19 @@ const ActualAmountScreen = () => {
   };
 
   const deleteActualAmount = (index: number) => {
-    Alert.alert(
-      "Delete Actual Amount",
-      "Are you sure you want to delete this actual amount?",
-      [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          onPress: () => {
-            const updatedData = [...actualAmounts];
-            updatedData.splice(index, 1);
-            setActualAmounts(updatedData);
-            saveActualAmounts(updatedData);
-          },
-          style: "destructive",
-        },
-      ]
-    );
+    const updatedData = [...actualAmounts];
+    updatedData.splice(index, 1);
+    setActualAmounts(updatedData);
+    saveActualAmounts(updatedData);
   };
-  
+
+  const updateActualAmount = (updatedActualAmount: ActualAmount) => {
+    const updatedData = actualAmounts.map((item) =>
+      item.id === updatedActualAmount.id ? updatedActualAmount : item
+    );
+    setActualAmounts(updatedData);
+    saveActualAmounts(updatedData);
+  };
 
   return (
     <View style={styles.container}>
@@ -99,6 +93,7 @@ const ActualAmountScreen = () => {
         value={actualAmount.sum.toString()}
         onChangeText={(text) => setActualAmount({ ...actualAmount, sum: parseFloat(text) || 0 })}
       />
+      
 
       <Button mode="contained" onPress={addActualAmount}>
         Add Actual Amount
@@ -108,11 +103,24 @@ const ActualAmountScreen = () => {
         {actualAmounts.map((item, index) => (
           <View key={index} style={styles.item}>
             <Text>
-              {item.type} - ${item.sum} 
+              {item.type} - ${item.sum}
             </Text>
-            <Button mode="text" onPress={() => deleteActualAmount(index)}>
-              Delete
-            </Button>
+            <View style={styles.actions}>
+              <Button mode="text" onPress={() => deleteActualAmount(index)}>
+                Delete
+              </Button>
+              <Button
+                mode="text"
+                onPress={() =>
+                  navigation.navigate("EditActualAmount", {
+                    actualAmounts: item,
+                    updateActualAmount: updateActualAmount,
+                  })
+                }
+              >
+                Edit
+              </Button>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -150,6 +158,9 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 4,
   },
+  actions: {
+    flexDirection: "row",
+  },
 });
 
-export default ActualAmountScreen;
+export default EditActualAmountScreen;

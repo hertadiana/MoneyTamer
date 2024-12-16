@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import React, { useState } from "react";
-import { StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 import { ScrollView } from "react-native-gesture-handler";
 import { Button } from "react-native-paper";
 import { Earning } from "../components/Earning"; // Adjust path as needed
@@ -62,10 +62,27 @@ const EarningsScreen = () => {
   };
 
   const deleteEarning = (index: number) => {
-    const newEarnings = [...earnings];
-    newEarnings.splice(index, 1);
-    setEarnings(newEarnings);
-    saveEarnings(newEarnings);
+    Alert.alert(
+      "Delete Earning",
+      "Are you sure you want to delete this earning?",
+      [
+        {
+          text: "Cancel",
+          onPress: () => console.log("Delete cancelled"),
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          onPress: () => {
+            const newEarnings = [...earnings];
+            newEarnings.splice(index, 1);
+            setEarnings(newEarnings);
+            saveEarnings(newEarnings);
+          },
+          style: "destructive",
+        },
+      ]
+    );
   };
 
   const updateEarning = (updatedEarning: Earning) => {
@@ -117,13 +134,14 @@ const EarningsScreen = () => {
               {item.type} - ${item.sum} - {item.date} - {item.mentions}
             </Text>
             <View style={styles.actions}>
-              <Button
-                mode="text"
-                onPress={() => deleteEarning(index)}
-                style={styles.actionButton}
-              >
-                Delete
-              </Button>
+            <Button
+  mode="text"
+  onPress={() => deleteEarning(index)}
+  style={styles.actionButton}
+>
+  Delete
+</Button>
+
               <Button
                 mode="text"
                 onPress={() =>
