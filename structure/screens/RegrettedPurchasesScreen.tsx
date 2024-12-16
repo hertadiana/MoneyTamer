@@ -1,30 +1,23 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "react-native-paper";
 import { RegrettedPurchase } from "../components/RegrettedPurchase";
 import { RegrettedPurchaseData } from "../data/RegrettedPurchaseData";
+import AddRegrettedPurchaseForm from "./add_forms/AddRegrettedPurchaseForm";
+import UpdateRegrettedPurchaseForm from "./edit_forms/UpdateRegrettedPurchaseForm";
 
-const STORAGE_KEY = "regrettedPurchase";
+const STORAGE_KEY = "regrettedPurchases";
 
 const RegrettedPurchasesScreen = () => {
   const [regrettedPurchases, setRegrettedPurchases] = useState<RegrettedPurchase[]>([]);
-  const [regrettedPurchase, setRegrettedPurchase] = useState<RegrettedPurchase>({
-    id: "",
-    item: "",
-    cost: 0,
-  });
+  const [editingPurchase, setEditingPurchase] = useState<RegrettedPurchase | null>(null);
 
   const loadRegrettedPurchases = async () => {
     try {
       const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedData) {
-        setRegrettedPurchases(JSON.parse(storedData));
-      } else {
-        setRegrettedPurchases(RegrettedPurchaseData);
-      }
+      setRegrettedPurchases(storedData ? JSON.parse(storedData) : RegrettedPurchaseData);
     } catch (error) {
       console.error("Failed to load regretted purchases", error);
     }
@@ -37,82 +30,75 @@ const RegrettedPurchasesScreen = () => {
       console.error("Failed to save regretted purchases", error);
     }
   };
+
   useFocusEffect(
     React.useCallback(() => {
       loadRegrettedPurchases();
     }, [])
   );
 
-  const addRegrettedPurchase = () => {
-    if (regrettedPurchase.item.trim() !== "" && regrettedPurchase.cost > 0) {
-      const newRegrettedPurchases = [
-        ...regrettedPurchases,
-        { ...regrettedPurchase, id: (regrettedPurchases.length + 1).toString() },
-      ];
-      setRegrettedPurchases(newRegrettedPurchases);
-      saveRegrettedPurchases(newRegrettedPurchases);
-      setRegrettedPurchase({ id: "", item: "", cost: 0 });
-    }
+  const addRegrettedPurchase = (newPurchase: RegrettedPurchase) => {
+    const updatedPurchases = [...regrettedPurchases, newPurchase];
+    setRegrettedPurchases(updatedPurchases);
+    saveRegrettedPurchases(updatedPurchases);
   };
 
-  const deleteRegrettedPurchase = (index: number) => {
+  const updateRegrettedPurchase = (updatedPurchase: RegrettedPurchase) => {
+    const updatedPurchases = regrettedPurchases.map((item) =>
+      item.id === updatedPurchase.id ? updatedPurchase : item
+    );
+    setRegrettedPurchases(updatedPurchases);
+    saveRegrettedPurchases(updatedPurchases);
+    setEditingPurchase(null);
+  };
+
+  const deleteRegrettedPurchase = (id: string) => {
     Alert.alert(
       "Delete Regretted Purchase",
       "Are you sure you want to delete this regretted purchase?",
       [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Delete",
-          onPress: () => {
-            const updatedData = [...regrettedPurchases];
-            updatedData.splice(index, 1);
-            setRegrettedPurchases(updatedData);
-            saveRegrettedPurchases(updatedData);
-          },
           style: "destructive",
+          onPress: () => {
+            const updatedPurchases = regrettedPurchases.filter((item) => item.id !== id);
+            setRegrettedPurchases(updatedPurchases);
+            saveRegrettedPurchases(updatedPurchases);
+          },
         },
       ]
     );
   };
-  
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Regretted Purchases</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Item"
-        value={regrettedPurchase.item}
-        onChangeText={(text) => setRegrettedPurchase({ ...regrettedPurchase, item: text })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Cost"
-        keyboardType="numeric"
-        value={regrettedPurchase.cost.toString()}
-        onChangeText={(text) =>
-          setRegrettedPurchase({ ...regrettedPurchase, cost: parseFloat(text) || 0 })
-        }
-      />
-
-      <Button mode="contained" onPress={addRegrettedPurchase}>
-        Add Regretted Purchase
-      </Button>
+      {editingPurchase ? (
+        <UpdateRegrettedPurchaseForm
+          purchase={editingPurchase}
+          onUpdate={updateRegrettedPurchase}
+          onCancel={() => setEditingPurchase(null)}
+        />
+      ) : (
+        <AddRegrettedPurchaseForm onAdd={addRegrettedPurchase} />
+      )}
 
       <ScrollView style={styles.list}>
-        {regrettedPurchases.map((item, index) => (
-          <View key={index} style={styles.item}>
+        {regrettedPurchases.map((item) => (
+          <View key={item.id} style={styles.item}>
             <Text>
               {item.item} - ${item.cost}
             </Text>
-            <Button mode="text" onPress={() => deleteRegrettedPurchase(index)}>
-              Delete
-            </Button>
+            <View style={styles.actions}>
+              <Button mode="text" onPress={() => deleteRegrettedPurchase(item.id)}>
+                Delete
+              </Button>
+              <Button mode="text" onPress={() => setEditingPurchase(item)}>
+                Edit
+              </Button>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -121,35 +107,11 @@ const RegrettedPurchasesScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 8,
-    marginBottom: 8,
-    borderRadius: 4,
-  },
-  list: {
-    marginTop: 16,
-  },
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 4,
-  },
+  container: { flex: 1, padding: 16 },
+  header: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
+  list: { marginTop: 16 },
+  item: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  actions: { flexDirection: "row" },
 });
 
 export default RegrettedPurchasesScreen;

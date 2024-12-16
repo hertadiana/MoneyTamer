@@ -1,41 +1,33 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "react-native-paper";
 import { ActualAmount } from "../components/ActualAmount";
 import { ActualAmountData } from "../data/ActualAmount";
+import AddActualAmountForm from "./add_forms/AddActualAmountForm";
+import UpdateActualAmountForm from "./edit_forms/UpdateActualAmountForm";
+
 const STORAGE_KEY = "actualAmounts";
 
 const ActualAmountScreen = () => {
   const [actualAmounts, setActualAmounts] = useState<ActualAmount[]>([]);
-  const [actualAmount, setActualAmount] = useState<ActualAmount>({
-    id: "",
-    type: "",
-    sum: 0,
-  });
+  const [editingAmount, setEditingAmount] = useState<ActualAmount | null>(null);
 
   const loadActualAmounts = async () => {
     try {
       const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedData) {
-        const parsedData = JSON.parse(storedData) as ActualAmount[]; 
-        setActualAmounts(parsedData);
-      } else {
-        setActualAmounts(ActualAmountData); 
-      }
+      setActualAmounts(storedData ? JSON.parse(storedData) : ActualAmountData);
     } catch (error) {
-      console.error("Failed to load data:", error);
+      console.error("Failed to load actual amounts", error);
     }
   };
-  
 
   const saveActualAmounts = async (data: ActualAmount[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch (error) {
-      console.error("Failed to save data", error);
+      console.error("Failed to save actual amounts", error);
     }
   };
 
@@ -45,74 +37,64 @@ const ActualAmountScreen = () => {
     }, [])
   );
 
-  const addActualAmount = () => {
-    if (actualAmount.type.trim() !== "" && actualAmount.sum > 0) {
-      const newActualAmounts = [
-        ...actualAmounts,
-        { ...actualAmount, id: (actualAmounts.length + 1).toString() },
-      ];
-      setActualAmounts(newActualAmounts);
-      saveActualAmounts(newActualAmounts);
-      setActualAmount({ id: "", type: "", sum: 0});
-    }
+  const addActualAmount = (newAmount: ActualAmount) => {
+    const updatedAmounts = [...actualAmounts, newAmount];
+    setActualAmounts(updatedAmounts);
+    saveActualAmounts(updatedAmounts);
   };
 
-  const deleteActualAmount = (index: number) => {
-    Alert.alert(
-      "Delete Actual Amount",
-      "Are you sure you want to delete this actual amount?",
-      [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          onPress: () => {
-            const updatedData = [...actualAmounts];
-            updatedData.splice(index, 1);
-            setActualAmounts(updatedData);
-            saveActualAmounts(updatedData);
-          },
-          style: "destructive",
-        },
-      ]
+  const updateActualAmount = (updatedAmount: ActualAmount) => {
+    const updatedAmounts = actualAmounts.map((item) =>
+      item.id === updatedAmount.id ? updatedAmount : item
     );
+    setActualAmounts(updatedAmounts);
+    saveActualAmounts(updatedAmounts);
+    setEditingAmount(null);
   };
-  
+
+  const deleteActualAmount = (id: string) => {
+    Alert.alert("Delete Actual Amount", "Are you sure you want to delete this amount?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const updatedAmounts = actualAmounts.filter((item) => item.id !== id);
+          setActualAmounts(updatedAmounts);
+          saveActualAmounts(updatedAmounts);
+        },
+      },
+    ]);
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Actual Amounts</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Type"
-        value={actualAmount.type}
-        onChangeText={(text) => setActualAmount({ ...actualAmount, type: text })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Sum"
-        keyboardType="numeric"
-        value={actualAmount.sum.toString()}
-        onChangeText={(text) => setActualAmount({ ...actualAmount, sum: parseFloat(text) || 0 })}
-      />
-
-      <Button mode="contained" onPress={addActualAmount}>
-        Add Actual Amount
-      </Button>
+      {editingAmount ? (
+        <UpdateActualAmountForm
+          actualAmount={editingAmount}
+          onUpdate={updateActualAmount}
+          onCancel={() => setEditingAmount(null)}
+        />
+      ) : (
+        <AddActualAmountForm onAdd={addActualAmount} />
+      )}
 
       <ScrollView style={styles.list}>
-        {actualAmounts.map((item, index) => (
-          <View key={index} style={styles.item}>
+        {actualAmounts.map((item) => (
+          <View key={item.id} style={styles.item}>
             <Text>
-              {item.type} - ${item.sum} 
+              {item.type} - ${item.sum}
             </Text>
-            <Button mode="text" onPress={() => deleteActualAmount(index)}>
-              Delete
-            </Button>
+            <View style={styles.actions}>
+              <Button mode="text" onPress={() => deleteActualAmount(item.id)}>
+                Delete
+              </Button>
+              <Button mode="text" onPress={() => setEditingAmount(item)}>
+                Edit
+              </Button>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -121,35 +103,11 @@ const ActualAmountScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 8,
-    marginBottom: 8,
-    borderRadius: 4,
-  },
-  list: {
-    marginTop: 16,
-  },
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 4,
-  },
+  container: { flex: 1, padding: 16 },
+  header: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
+  list: { marginTop: 16 },
+  item: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  actions: { flexDirection: "row" },
 });
 
 export default ActualAmountScreen;

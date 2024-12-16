@@ -1,30 +1,23 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "react-native-paper";
 import { MonthlyCheck } from "../components/MonthlyCheck";
 import { MonthlyCheckData } from "../data/MonthlyCheckData";
+import AddMonthlyCheckForm from "./add_forms/AddMonthlyCheckForm";
+import UpdateMonthlyCheckForm from "./edit_forms/UpdateMonthlyCheckForm";
 
 const STORAGE_KEY = "monthlyChecks";
 
 const MonthlyChecksScreen = () => {
   const [monthlyChecks, setMonthlyChecks] = useState<MonthlyCheck[]>([]);
-  const [monthlyCheck, setMonthlyCheck] = useState<MonthlyCheck>({
-    id: "",
-    item: "",
-    type: "Need",
-  });
+  const [editingMonthlyCheck, setEditingMonthlyCheck] = useState<MonthlyCheck | null>(null);
 
   const loadMonthlyChecks = async () => {
     try {
       const storedData = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedData) {
-        setMonthlyChecks(JSON.parse(storedData));
-      } else {
-        setMonthlyChecks(MonthlyCheckData);
-      }
+      setMonthlyChecks(storedData ? JSON.parse(storedData) : MonthlyCheckData);
     } catch (error) {
       console.error("Failed to load monthly checks", error);
     }
@@ -37,78 +30,71 @@ const MonthlyChecksScreen = () => {
       console.error("Failed to save monthly checks", error);
     }
   };
+
   useFocusEffect(
     React.useCallback(() => {
       loadMonthlyChecks();
     }, [])
   );
 
-  const addMonthlyCheck = () => {
-    if (monthlyCheck.item.trim() !== "") {
-      const newMonthlyChecks = [
-        ...monthlyChecks,
-        { ...monthlyCheck, id: (monthlyChecks.length + 1).toString() },
-      ];
-      setMonthlyChecks(newMonthlyChecks);
-      saveMonthlyChecks(newMonthlyChecks);
-      setMonthlyCheck({ id: "", item: "", type: "Need" });
-    }
+  const addMonthlyCheck = (newCheck: MonthlyCheck) => {
+    const updatedChecks = [...monthlyChecks, newCheck];
+    setMonthlyChecks(updatedChecks);
+    saveMonthlyChecks(updatedChecks);
   };
 
-  const deleteMonthlyCheck = (index: number) => {
-    Alert.alert(
-      "Delete Monthly Check",
-      "Are you sure you want to delete this monthly check?",
-      [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          onPress: () => {
-            const updatedData = [...monthlyChecks];
-            updatedData.splice(index, 1);
-            setMonthlyChecks(updatedData);
-            saveMonthlyChecks(updatedData);
-          },
-          style: "destructive",
-        },
-      ]
+  const updateMonthlyCheck = (updatedCheck: MonthlyCheck) => {
+    const updatedChecks = monthlyChecks.map((item) =>
+      item.id === updatedCheck.id ? updatedCheck : item
     );
+    setMonthlyChecks(updatedChecks);
+    saveMonthlyChecks(updatedChecks);
+    setEditingMonthlyCheck(null);
   };
-  
+
+  const deleteMonthlyCheck = (id: string) => {
+    Alert.alert("Delete Monthly Check", "Are you sure you want to delete this check?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const updatedChecks = monthlyChecks.filter((item) => item.id !== id);
+          setMonthlyChecks(updatedChecks);
+          saveMonthlyChecks(updatedChecks);
+        },
+      },
+    ]);
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Monthly Checks</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Item"
-        value={monthlyCheck.item}
-        onChangeText={(text) => setMonthlyCheck({ ...monthlyCheck, item: text })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Type (Need or Want)"
-        value={monthlyCheck.type}
-        onChangeText={(text) => setMonthlyCheck({ ...monthlyCheck, type: text as "Need" | "Want" })}
-      />
-
-      <Button mode="contained" onPress={addMonthlyCheck}>
-        Add Monthly Check
-      </Button>
+      {editingMonthlyCheck ? (
+        <UpdateMonthlyCheckForm
+          monthlyCheck={editingMonthlyCheck}
+          onUpdate={updateMonthlyCheck}
+          onCancel={() => setEditingMonthlyCheck(null)}
+        />
+      ) : (
+        <AddMonthlyCheckForm onAdd={addMonthlyCheck} />
+      )}
 
       <ScrollView style={styles.list}>
-        {monthlyChecks.map((item, index) => (
-          <View key={index} style={styles.item}>
+        {monthlyChecks.map((item) => (
+          <View key={item.id} style={styles.item}>
             <Text>
               {item.item} - {item.type}
             </Text>
-            <Button mode="text" onPress={() => deleteMonthlyCheck(index)}>
-              Delete
-            </Button>
+            <View style={styles.actions}>
+              <Button mode="text" onPress={() => deleteMonthlyCheck(item.id)}>
+                Delete
+              </Button>
+              <Button mode="text" onPress={() => setEditingMonthlyCheck(item)}>
+                Edit
+              </Button>
+            </View>
           </View>
         ))}
       </ScrollView>
@@ -117,35 +103,11 @@ const MonthlyChecksScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 8,
-    marginBottom: 8,
-    borderRadius: 4,
-  },
-  list: {
-    marginTop: 16,
-  },
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 4,
-  },
+  container: { flex: 1, padding: 16 },
+  header: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
+  list: { marginTop: 16 },
+  item: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  actions: { flexDirection: "row" },
 });
 
 export default MonthlyChecksScreen;

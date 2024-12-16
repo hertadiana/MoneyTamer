@@ -1,38 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
+import { useFocusEffect } from "@react-navigation/native";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
-import { ScrollView } from "react-native-gesture-handler";
+import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "react-native-paper";
-import { Earning } from "../components/Earning"; // Adjust path as needed
-import { EarningsData } from "../data/EarningsData"; // Adjust path as needed
-import { RootStackParamList } from "../data/types"; // Import the route types
-
-type NavigationProps = StackNavigationProp<RootStackParamList, "Earnings">;
-
+import { Earning } from "../components/Earning";
+import { EarningsData } from "../data/EarningsData";
+import AddEarningForm from "./add_forms/AddEarningForm";
+import UpdateEarningForm from "./edit_forms/UpdateEarningForm";
 const STORAGE_KEY = "earnings";
 
 const EarningsScreen = () => {
   const [earnings, setEarnings] = useState<Earning[]>([]);
-  const [earning, setEarning] = useState<Earning>({
-    id: "",
-    type: "",
-    sum: 0,
-    date: "",
-    mentions: "",
-  });
-
-  const navigation = useNavigation<NavigationProps>();
+  const [editingEarning, setEditingEarning] = useState<Earning | null>(null);
 
   const loadEarnings = async () => {
     try {
       const storedEarnings = await AsyncStorage.getItem(STORAGE_KEY);
-      if (storedEarnings) {
-        setEarnings(JSON.parse(storedEarnings));
-      } else {
-        setEarnings(EarningsData);
-      }
+      setEarnings(storedEarnings ? JSON.parse(storedEarnings) : EarningsData);
     } catch (error) {
       console.error("Failed to load earnings", error);
     }
@@ -52,37 +36,10 @@ const EarningsScreen = () => {
     }, [])
   );
 
-  const addEarning = () => {
-    if (earning.type.trim() !== "" && earning.sum > 0) {
-      const newEarnings = [...earnings, { ...earning, id: (earnings.length + 1).toString() }];
-      setEarnings(newEarnings);
-      saveEarnings(newEarnings);
-      setEarning({ id: "", type: "", sum: 0, date: "", mentions: "" });
-    }
-  };
-
-  const deleteEarning = (index: number) => {
-    Alert.alert(
-      "Delete Earning",
-      "Are you sure you want to delete this earning?",
-      [
-        {
-          text: "Cancel",
-          onPress: () => console.log("Delete cancelled"),
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          onPress: () => {
-            const newEarnings = [...earnings];
-            newEarnings.splice(index, 1);
-            setEarnings(newEarnings);
-            saveEarnings(newEarnings);
-          },
-          style: "destructive",
-        },
-      ]
-    );
+  const addEarning = (newEarning: Earning) => {
+    const updatedEarnings = [...earnings, newEarning];
+    setEarnings(updatedEarnings);
+    saveEarnings(updatedEarnings);
   };
 
   const updateEarning = (updatedEarning: Earning) => {
@@ -91,67 +48,49 @@ const EarningsScreen = () => {
     );
     setEarnings(updatedEarnings);
     saveEarnings(updatedEarnings);
+    setEditingEarning(null);
+  };
+
+  const deleteEarning = (id: string) => {
+    Alert.alert("Delete Earning", "Are you sure you want to delete this earning?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const updatedEarnings = earnings.filter((item) => item.id !== id);
+          setEarnings(updatedEarnings);
+          saveEarnings(updatedEarnings);
+        },
+      },
+    ]);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Earnings</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Type (e.g., Job, Allowance)"
-        value={earning.type}
-        onChangeText={(text) => setEarning({ ...earning, type: text })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Sum"
-        keyboardType="numeric"
-        value={earning.sum.toString()}
-        onChangeText={(text) => setEarning({ ...earning, sum: parseFloat(text) || 0 })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Date"
-        value={earning.date}
-        onChangeText={(text) => setEarning({ ...earning, date: text })}
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Mentions"
-        value={earning.mentions}
-        onChangeText={(text) => setEarning({ ...earning, mentions: text })}
-      />
-
-      <Button mode="contained" onPress={addEarning}>
-        Add Earning
-      </Button>
+      {editingEarning ? (
+        <UpdateEarningForm
+          earning={editingEarning}
+          onUpdate={updateEarning}
+          onCancel={() => setEditingEarning(null)}
+        />
+      ) : (
+        <AddEarningForm onAdd={addEarning} />
+      )}
 
       <ScrollView style={styles.list}>
-        {earnings.map((item, index) => (
-          <View key={index} style={styles.item}>
+        {earnings.map((item) => (
+          <View key={item.id} style={styles.item}>
             <Text>
               {item.type} - ${item.sum} - {item.date} - {item.mentions}
             </Text>
             <View style={styles.actions}>
-            <Button
-  mode="text"
-  onPress={() => deleteEarning(index)}
-  style={styles.actionButton}
->
-  Delete
-</Button>
-
-              <Button
-                mode="text"
-                onPress={() =>
-                  navigation.navigate("EditEarning", {
-                    earning: item,
-                    updateEarning: updateEarning,
-                  })
-                }
-                style={styles.actionButton}
-              >
+              <Button mode="text" onPress={() => deleteEarning(item.id)}>
+                Delete
+              </Button>
+              <Button mode="text" onPress={() => setEditingEarning(item)}>
                 Edit
               </Button>
             </View>
@@ -163,41 +102,11 @@ const EarningsScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 16,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 8,
-    marginBottom: 8,
-    borderRadius: 4,
-  },
-  list: {
-    marginTop: 16,
-  },
-  item: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 4,
-  },
-  actions: {
-    flexDirection: "row",
-  },
-  actionButton: {
-    marginLeft: 8,
-  },
+  container: { flex: 1, padding: 16 },
+  header: { fontSize: 24, fontWeight: "bold", marginBottom: 16 },
+  list: { marginTop: 16 },
+  item: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+  actions: { flexDirection: "row" },
 });
 
 export default EarningsScreen;
